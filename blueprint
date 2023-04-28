@@ -8,6 +8,8 @@ blueprint:
       description: Muller Licht Tint remote to use
       selector:
         device:
+          integration: zha
+          manufacturer: MLI
     target_light:
       name: Light(s)
       description: The light(s) to control
@@ -59,7 +61,8 @@ blueprint:
           domain: scene
     force_brightness:
       name: Force turn on brightness
-      description: 'Force the brightness to the set level below, when the "on" button on the remote is pushed and lights turn on.'
+      description: Force the brightness to the set level below, when the "on" button
+        on the remote is pushed and lights turn on.
       default: false
       selector:
         boolean: {}
@@ -73,7 +76,7 @@ blueprint:
           max: 100.0
           mode: slider
           step: 1.0
-          unit_of_measurement: "%"
+          unit_of_measurement: '%'
     step_value:
       name: Brightness increment/decrement percent
       description: Set the step percent value for brightness and color warmth
@@ -84,101 +87,102 @@ blueprint:
           max: 20.0
           mode: slider
           step: 1.0
-          unit_of_measurement: "%"
+          unit_of_measurement: '%'
+  source_url: https://community.home-assistant.io/t/muller-licht-tint-remote/283190
 mode: restart
 max_exceeded: silent
 variables:
-  force_brightness: !input "force_brightness"
-  step_value: !input "step_value"
-  colour_ref: !input "colour_ref"
+  force_brightness: !input 'force_brightness'
+  step_value: !input 'step_value'
+  colour_ref: !input 'colour_ref'
 trigger:
-  - platform: event
-    event_type: deconz_event
-    event_data:
-      device_id: !input "remote"
+- platform: event
+  event_type: zha_event
+  event_data:
+    device_id: !input 'remote'
 action:
-  - variables:
-      event: "{{ trigger.event.data.event }}"
-  - choose:
-      - conditions:
-          - "{{ event == 1002 }}"
+- variables:
+    event: '{{ trigger.event.data.cluster_id }}'
+- choose:
+  - conditions:
+    - '{{ event == 6 }}'
+    sequence:
+    - choose:
+      - conditions: '{{ force_brightness }}'
         sequence:
-          - choose:
-              - conditions: "{{ force_brightness }}"
-                sequence:
-                  - service: light.toggle
-                    target: !input target_light
-                    data:
-                      brightness_pct: !input "brightness"
-            default:
-              - service: light.toggle
-                target: !input target_light
-      - conditions:
-          - "{{ event == 2002 }}"
-        sequence:
-          - service: light.turn_on
-            target: !input target_light
-            data:
-              brightness_step_pct: "{{ step_value }}"
-              transition: 1
-      - conditions:
-          - "{{ event == 3002 }}"
-        sequence:
-          - service: light.turn_on
-            target: !input target_light
-            data:
-              brightness_step_pct: "-{{ step_value }}"
-              transition: 1
-      - conditions:
-          - "{{ event == 4002 }}"
-        sequence:
-          - service: light.turn_on
-            target: !input target_light
-            data:
-              color_temp: "{{state_attr(colour_ref, 'color_temp')|int + 60}}"
-      - conditions:
-          - "{{ event == 5002 }}"
-        sequence:
-          - service: light.turn_on
-            target: !input target_light
-            data:
-              color_temp: "{{state_attr(colour_ref, 'color_temp')|int - 60}}"
-      - conditions:
-          - "{{ event == 6002 }}"
-        sequence:
-          - service: light.turn_on
-            target: !input target_light
-            data:
-              xy_color:
-                - "{{ trigger.event.data.xy.0 }}"
-                - "{{ trigger.event.data.xy.1 }}"
-      - conditions:
-          - "{{ event == 7002 }}"
-        sequence:
-          - service: homeassistant.turn_on
-            entity_id: !input working_scene
-      - conditions:
-          - "{{ event == 8002 }}"
-        sequence:
-          - service: homeassistant.turn_on
-            entity_id: !input sunset_scene
-      - conditions:
-          - "{{ event == 9002 }}"
-        sequence:
-          - service: homeassistant.turn_on
-            entity_id: !input party_scene
-      - conditions:
-          - "{{ event == 10002 }}"
-        sequence:
-          - service: homeassistant.turn_on
-            entity_id: !input night_scene
-      - conditions:
-          - "{{ event == 11002 }}"
-        sequence:
-          - service: homeassistant.turn_on
-            entity_id: !input campfire_scene
-      - conditions:
-          - "{{ event == 12002 }}"
-        sequence:
-          - service: homeassistant.turn_on
-            entity_id: !input romantic_scene
+        - service: light.toggle
+          target: !input 'target_light'
+          data:
+            brightness_pct: !input 'brightness'
+      default:
+      - service: light.toggle
+        target: !input 'target_light'
+  - conditions:
+    - '{{ event == 8 }}'
+    - '{{ trigger.event.data.args==[0,43,10] }} '
+    sequence:
+    - service: light.turn_on
+      target: !input 'target_light'
+      data:
+        brightness_step_pct: '{{ step_value }}'
+        transition: 1
+  - conditions:
+    - '{{ event == 8 }}'
+    - '{{ trigger.event.data.args==[1,43,10] }}'
+    sequence:
+    - service: light.turn_on
+      target: !input 'target_light'
+      data:
+        brightness_step_pct: -{{ step_value }}
+        transition: 1
+  - conditions:
+    - '{{ trigger.event.data.command == ''move_to_color_temp'' }}'
+    sequence:
+    - service: light.turn_on
+      target: !input 'target_light'
+      data:
+        color_temp: '{{ trigger.event.data.args[0] }}'
+  - conditions:
+    - '{{ event == 5002 }}'
+    sequence:
+    - service: light.turn_on
+      target: !input 'target_light'
+      data:
+        color_temp: '{trigger.event.data.args[0] |int}}'
+  - conditions:
+    - '{{ trigger.event.data.command == ''move_to_color'' }}'
+    sequence:
+    - service: light.turn_on
+      target: !input 'target_light'
+      data:
+        xy_color: '[{{ trigger.event.data.args[0]|float/45875 }}, {{trigger.event.data.args[1]|float/45875 }}]'
+  - conditions:
+    - '{{ event == 7002 }}'
+    sequence:
+    - service: homeassistant.turn_on
+      entity_id: !input 'working_scene'
+  - conditions:
+    - '{{ event == 8002 }}'
+    sequence:
+    - service: homeassistant.turn_on
+      entity_id: !input 'sunset_scene'
+  - conditions:
+    - '{{ event == 9002 }}'
+    sequence:
+    - service: homeassistant.turn_on
+      entity_id: !input 'party_scene'
+  - conditions:
+    - '{{ event == 10002 }}'
+    sequence:
+    - service: homeassistant.turn_on
+      entity_id: !input 'night_scene'
+  - conditions:
+    - '{{ event == 11002 }}'
+    sequence:
+    - service: homeassistant.turn_on
+      entity_id: !input 'campfire_scene'
+  - conditions:
+    - '{{ event == 12002 }}'
+    sequence:
+    - service: homeassistant.turn_on
+      entity_id: !input 'romantic_scene'
